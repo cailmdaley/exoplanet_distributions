@@ -195,6 +195,9 @@ class System:
                 data=self.lightcurve.observed, 
                 model=model_RVs)         
             
+            return lnlike
+        
+            # some informational print outs for lnlike():
             # if lnlike > self.lnlike: 
             #     self.lnlike = lnlike
             #     # print('model     : m={:.0}, a={:.0}, e={:.1}, omega={:.1}, t0={:.1}'.format(cube[0], cube[1], cube[2], cube[3], cube[4]))
@@ -206,7 +209,6 @@ class System:
             #     print('')
             #     self.lightcurve['model'] = model_RVs
 
-            return lnlike
         pmn.run(
             n_live_points=500,
             LogLikelihood=lnlike, 
@@ -324,7 +326,7 @@ class Distribution:
             library = self.library
             x = 'm_true'; y = 'a_true'
             xlim = library.m_true.describe()[['min','max']] + np.array([-0.15, .15])
-            ylim = library.a_true.describe()[['min','max']] + np.array([-0.15, .15])
+            ylim = library.a_true.describe()[['min','max']] + np.array([-0.05, .05])
             
             C = self.library.SNR; mincnt=None #hexbin params
             # norm=colors.LogNorm(vmin=C.min(), vmax=C.max())
@@ -336,7 +338,7 @@ class Distribution:
                 if exclude is True else self.library.dropna()
             x = 'm_fit'; y = 'a_fit'
             xlim = library.m_fit.describe()[['min','max']] + np.array([-0.15, .15])
-            ylim = library.a_fit.describe()[['min','max']] + np.array([-0.15, .15])
+            ylim = library.a_fit.describe()[['min','max']] + np.array([-0.05, .05])
             
             C = None; mincnt=1 #hexbin params
             bins=None; n_colors=None; cbar_label = 'Count'
@@ -350,7 +352,7 @@ class Distribution:
         
         # g.plot_joint(colplot, color=IOError, cmap=cmap)
         # g.plot_joint(sns.kdeplot, cmap=cmap, n_levels=5)
-        g.plot_joint(plt.hexbin, gridsize=100, C=C, bins=bins, cmap=cmap, mincnt=mincnt)
+        g.plot_joint(plt.hexbin, gridsize=50, C=C, bins=bins, cmap=cmap, mincnt=mincnt)
         
         g.plot_marginals(sns.distplot, hist=False, kde=True, rug=True, 
             kde_kws={'shade': True})#, kde_kws={'cut':0, 'bw':0.4})
@@ -403,6 +405,6 @@ class Distribution:
         self.dir = directory
         self.collect_distribution()
         
-dist = Distribution('planets2/')
+# dist = Distribution('planets2/')
 # dist.plot('intrinsic', save='figures/planets2_intrinsic')
 # dist.plot('observed', save='figures/planets2_observed')
