@@ -355,10 +355,9 @@ class Distribution:
         g.plot_marginals(sns.distplot, hist=False, kde=True, rug=True, 
             kde_kws={'shade': True})#, kde_kws={'cut':0, 'bw':0.4})
             
-        if hue is not None:
-            cax = g.fig.add_axes([1, .095, .03, .75])
-            cbar = plt.colorbar(cax=cax)
-            cbar.ax.set_ylabel(cbar_label)
+        cax = g.fig.add_axes([1, .095, .03, .75])
+        cbar = plt.colorbar(cax=cax)
+        cbar.ax.set_ylabel(cbar_label)
             
         if save:
             g.savefig(save)
