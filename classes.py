@@ -262,7 +262,7 @@ class Distribution:
         
         try:
             sys.info = json.load(open(path + 'info.json'))
-        except FileNotFoundError:
+        except IOError:
             warnings.warn('{}info.json does not exist'.format(path), UserWarning)
         
         try:
@@ -276,7 +276,7 @@ class Distribution:
                 
             try:
                 params = json.load(open(path + 'ps{}_params.json'.format(i+1)))
-            except FileNotFoundError:
+            except IOError:
                 warnings.warn('{}ps{}_params.json does not exist'.format(path, i+1), UserWarning)
             try:
                 sys.analyzer = pmn.Analyzer(len(sys.info) * 3, 
@@ -293,7 +293,7 @@ class Distribution:
                     for i in range(len(sys.info))])[0] 
                     for date in sys.lightcurve.JD ]
                 sys.lightcurve[planet] = model_RVs
-            except (FileNotFoundError, IndexError):
+            except (IOError, IndexError):
                 sys.analyzer = None
                 warnings.warn('{}ps{}_.txt does not exist'.format(path, i+1), UserWarning)
             
@@ -348,7 +348,7 @@ class Distribution:
         g.set_axis_labels(xlabel=r'log $M_\oplus$', ylabel='log au')
         cmap = ListedColormap(sns.color_palette('Blues_d', n_colors).as_hex()[::-1])
         
-        # g.plot_joint(colplot, color=hue, cmap=cmap)
+        # g.plot_joint(colplot, color=IOError, cmap=cmap)
         # g.plot_joint(sns.kdeplot, cmap=cmap, n_levels=5)
         g.plot_joint(plt.hexbin, gridsize=100, C=C, bins=bins, cmap=cmap, mincnt=mincnt)
         
@@ -404,6 +404,6 @@ class Distribution:
         self.dir = directory
         self.collect_distribution()
         
-# dist = Distribution('planets2/')
+dist = Distribution('planets2/')
 # dist.plot('intrinsic', save='figures/planets2_intrinsic')
 # dist.plot('observed', save='figures/planets2_observed')
