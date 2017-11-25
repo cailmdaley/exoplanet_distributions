@@ -4,6 +4,7 @@ import seaborn as sns
 import scipy.optimize
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+import matplotlib.colors as colors
 from astropy import units as u
 import astropy.constants as c
 from astrocail import utils
@@ -317,41 +318,52 @@ class Distribution:
                         sys.analyzer.get_stats()['modes'][0]['local log-evidence']
                     self.library.loc[10*i+j+1, 'SNR'] = \
                         sys.lightcurve.loc[:,'p{}'.format(j+1)].abs().max()
-    def plot_intrinsic(self,save=None, hue=None, vmin=None):
-        cmap = ListedColormap(sns.color_palette('Blues_d').as_hex()[::-1])
-        if hue is not None: hue = self.library.loc[:,hue]
+                        
+    def plot(self, kind, save=None, exclude=True):
+        if kind is 'intrinsic':
+            library = self.library
+            x = 'm_true'; y = 'a_true'
+            xlim = library.m_true.describe()[['min','max']] + np.array([-0.15, .15])
+            ylim = library.a_true.describe()[['min','max']] + np.array([-0.15, .15])
+            
+            C = self.library.SNR; mincnt=None #hexbin params
+            # norm=colors.LogNorm(vmin=C.min(), vmax=C.max())
+            bins = [10**n for n in range(0, 1 + int(np.ceil(np.log10(C.max()))))]
+            n_colors = len(bins) - 1; cbar_label = 'log Fit SNR'
+            
+        elif kind is 'observed':
+            library = self.library[self.library.SNR > 1.].dropna() \
+                if exclude is True else self.library.dropna()
+            x = 'm_fit'; y = 'a_fit'
+            xlim = library.m_fit.describe()[['min','max']] + np.array([-0.15, .15])
+            ylim = library.a_fit.describe()[['min','max']] + np.array([-0.15, .15])
+            
+            C = None; mincnt=1 #hexbin params
+            bins=None; n_colors=None; cbar_label = 'Count'
+            
+        else:
+            raise NameError("kind arg must be either 'observed' or 'intrinsic'")
         
-        g = sns.JointGrid(data=self.library, 
-            x='m_true', xlim=self.library.m_true.describe()[['min','max']] + np.array([-0.15, .15]),
-            y='a_true', ylim=self.library.a_true.describe()[['min','max']] + np.array([-0.15, .15]))
-        g.plot_joint(colplot, color=hue, cmap=cmap)
-        g.plot_marginals(sns.distplot, kde=True, rug=True)#, kde_kws={'cut':0, 'bw':0.4})
+        g = sns.JointGrid(data=self.library, x=x, y=y, xlim=xlim, ylim=ylim)
         g.set_axis_labels(xlabel=r'log $M_\oplus$', ylabel='log au')
+        cmap = ListedColormap(sns.color_palette('Blues_d', n_colors).as_hex()[::-1])
+        
+        # g.plot_joint(colplot, color=hue, cmap=cmap)
+        # g.plot_joint(sns.kdeplot, cmap=cmap, n_levels=5)
+        g.plot_joint(plt.hexbin, gridsize=100, C=C, bins=bins, cmap=cmap, mincnt=mincnt)
+        
+        g.plot_marginals(sns.distplot, hist=False, kde=True, rug=True, 
+            kde_kws={'shade': True})#, kde_kws={'cut':0, 'bw':0.4})
+            
         if hue is not None:
             cax = g.fig.add_axes([1, .095, .03, .75])
             cbar = plt.colorbar(cax=cax)
-            cbar.ax.set_ylabel('Fit SNR')
+            cbar.ax.set_ylabel(cbar_label)
+            
         if save:
             g.savefig(save)
         plt.show()
             
-    def plot_observed(self, save=None, hue=None, vmin=None):
-        cmap = ListedColormap(sns.color_palette('Blues_d').as_hex()[::-1])
-        if hue is not None: hue = self.library.loc[:,hue]
-        g = sns.PairGrid(data=self.library, x_vars=['m_fit'], y_vars=['a_fit'],
-            palette='Blues_d', size=5)#, hue=hue, palette='Blues_d')
-        g.set(xscale='log', yscale='log')
-        g.map(colplot, color=hue, cmap=cmap, vmin=vmin)
-        g.set(xlabel=r'Fit $m$ (Earth Masses)', ylabel=r'Fit $a$ (au)')
-        
-        if hue is not None:
-            cax = g.fig.add_axes([.98, .145, .03, .8])
-            plt.colorbar(cax=cax)
-        if save:
-            g.savefig(save)
-        plt.show()
-        
-            # sns.pairplot(data=dist.library, vars=['m_true', 'a_true']); plt.show()
     def plot_comparison(self, save=None, hue=None, vmin=None, drop=False):
         cmap = ListedColormap(sns.color_palette('Blues_d').as_hex()[::-1])
         
@@ -392,3 +404,6 @@ class Distribution:
         self.dir = directory
         self.collect_distribution()
         
+# dist = Distribution('planets2/')
+# dist.plot('intrinsic', save='figures/planets2_intrinsic')
+# dist.plot('observed', save='figures/planets2_observed')
