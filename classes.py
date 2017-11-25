@@ -195,6 +195,7 @@ class System:
                 data=self.lightcurve.observed, 
                 model=model_RVs)         
             
+            # some informational print outs
             # if lnlike > self.lnlike: 
             #     self.lnlike = lnlike
             #     # print('model     : m={:.0}, a={:.0}, e={:.1}, omega={:.1}, t0={:.1}'.format(cube[0], cube[1], cube[2], cube[3], cube[4]))
@@ -404,5 +405,5 @@ class Distribution:
         self.collect_distribution()
         
 dist = Distribution('planets2/')
-# dist.plot('intrinsic', save='figures/planets2_intrinsic')
-# dist.plot('observed', save='figures/planets2_observed')
+dist.plot('intrinsic', save='figures/planets2_intrinsic')
+dist.plot('observed', save='figures/planets2_observed')
