@@ -302,7 +302,7 @@ class Distribution:
         return sys
     def collect_distribution(self):
         # multiindex = pd.MultiIndex(levels=[[]]*2, labels=[[]]*2, names=['system', 'planet'])
-        self.library = pd.DataFrame(columns=['m_true','a_true', 'm_fit', 'a_fit', 'lnZ', 'SNR'], dtype=float)
+        self.library = pd.DataFrame(columns=['m_true','a_true', 'm_fit', 'a_fit', 'lnZ', 'fit_SNR'], dtype=float)
         
         self.paths = [path[:-9] for path in glob(self.dir + '/*info.json')]
         for i, path in enumerate(self.paths):
@@ -318,8 +318,10 @@ class Distribution:
                     self.library.loc[10*i+j+1, ['m_fit', 'a_fit']] =m_fit, a_fit 
                     self.library.loc[10*i+j+1, 'lnZ'] = \
                         sys.analyzer.get_stats()['modes'][0]['local log-evidence']
-                    self.library.loc[10*i+j+1, 'SNR'] = \
+                    self.library.loc[10*i+j+1, 'fit_SNR'] = \
                         sys.lightcurve.loc[:,'p{}'.format(j+1)].abs().max()
+                    # self.library.loc[10*i+j+1, 'observed_SNR'] = \
+                    #     sys.lightcurve.observed.abs().max()
                         
     def plot(self, kind, save=None, exclude=True):
         if kind is 'intrinsic':
@@ -328,33 +330,33 @@ class Distribution:
             xlim = library.m_true.describe()[['min','max']] + np.array([-0.15, .15])
             ylim = library.a_true.describe()[['min','max']] + np.array([-0.05, .05])
             
-            C = self.library.SNR; mincnt=None #hexbin params
+            C = self.library.fit_SNR; mincnt=None #hexbin params
             # norm=colors.LogNorm(vmin=C.min(), vmax=C.max())
             bins = [10**n for n in range(0, 1 + int(np.ceil(np.log10(C.max()))))]
-            n_colors = len(bins) - 1; cbar_label = 'log Fit SNR'
+            n_colors = 2*(len(bins) - 1); cbar_label = 'log Fit SNR'
             
         elif kind is 'observed':
-            library = self.library[self.library.SNR > 1.].dropna() \
+            library = self.library[self.library.fit_SNR > 1.].dropna() \
                 if exclude is True else self.library.dropna()
             x = 'm_fit'; y = 'a_fit'
             xlim = library.m_fit.describe()[['min','max']] + np.array([-0.15, .15])
             ylim = library.a_fit.describe()[['min','max']] + np.array([-0.05, .05])
             
             C = None; mincnt=1 #hexbin params
-            bins=None; n_colors=None; cbar_label = 'Count'
+            bins=None; n_colors=None; cbar_label = 'Counts'
             
         else:
             raise NameError("kind arg must be either 'observed' or 'intrinsic'")
         
         g = sns.JointGrid(data=self.library, x=x, y=y, xlim=xlim, ylim=ylim)
-        g.set_axis_labels(xlabel=r'log $M_\oplus$', ylabel='log au')
+        g.set_axis_labels(xlabel=r'log $m$ ($M_\oplus$)', ylabel='log $a$ (au)')
         cmap = ListedColormap(sns.color_palette('Blues_d', n_colors).as_hex()[::-1])
         
         # g.plot_joint(colplot, color=IOError, cmap=cmap)
         # g.plot_joint(sns.kdeplot, cmap=cmap, n_levels=5)
         g.plot_joint(plt.hexbin, gridsize=50, C=C, bins=bins, cmap=cmap, mincnt=mincnt)
         
-        g.plot_marginals(sns.distplot, hist=False, kde=True, rug=True, 
+        g.plot_marginals(sns.distplot, hist=False, kde=True, rug=False, 
             kde_kws={'shade': True})#, kde_kws={'cut':0, 'bw':0.4})
             
         cax = g.fig.add_axes([1, .095, .03, .75])
@@ -364,47 +366,64 @@ class Distribution:
         if save:
             g.savefig(save)
         plt.show()
+        
+    def compare(self, save=None):
+        fig, (ax1, ax2) = plt.subplots(2, figsize=(8,6)); sns.despine(left=True);
+        sns.distplot(self.library.m_true, ax=ax1, 
+            rug=False, hist=False, kde=True, kde_kws={'shade': True},
+            label=r'True $m$')
+        sns.distplot(self.library[self.library.fit_SNR > 1.].m_fit, ax=ax1, 
+            rug=False, hist=False, kde=True, kde_kws={'shade': True},
+            label=r'Fit $m$', axlabel=r'log $m$ ($M_\oplus$)')
+        sns.distplot(self.library.a_true, ax=ax2, 
+            rug=False, hist=False, kde=True, kde_kws={'shade': True},
+            label=r'True $a$')
+        sns.distplot(self.library[self.library.fit_SNR > 1.].a_fit, ax=ax2, 
+            rug=False, hist=False, kde=True, kde_kws={'shade': True},
+            label=r'Fit $a$', axlabel=r'log $a$ (au)')    
             
-    def plot_comparison(self, save=None, hue=None, vmin=None, drop=False):
+        # add common ylabel
+        fig.add_subplot(111, frameon=False)
+        plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
+        plt.grid(False)
+        plt.ylabel("Normalized Probability Density")
+        # ax1.set_title('Mass'); ax2.set_title('Semi-major axis')
+        # get rid of meaningless y axis labels
+        for ax in [ax1, ax2]:
+            ax.tick_params(axis='y', which='both', labelcolor='none', left='off')
+        plt.tight_layout() 
+        
+        if save:
+            fig.savefig(save)
+        plt.show()
+                
+            
+    def correlations(self, save=None):
         cmap = ListedColormap(sns.color_palette('Blues_d').as_hex()[::-1])
         
-        data = self.library.dropna()
-        if drop:
-            data = data[data.SNR > 1.]
-        if hue is not None: hue = data.loc[:,hue]
-            
-        g = sns.PairGrid(data=data, vars=['m_true', 'a_true', 'm_fit', 'a_fit'], 
-            palette='Blues_d', size=5)#, hue=hue, palette='Blues_d')
-        labels = [r'True $m$ (Earth Masses)', r'True $a$ (au)', r'Fit $m$ (Earth Masses)', r'Fit $a$ (au)', ]
-        g.set(xscale='log', yscale='log')
-        g.map_offdiag(colplot, color=hue, cmap=cmap, vmin=vmin)
-        g.map_diag(sns.kdeplot, cut=0)
-        for i in range(len(labels)):
-            for j in range(len(labels)):
-                if g.axes[i][j].get_ylabel() is not '':
-                    g.axes[i][j].set_ylabel(labels[i])
-                if g.axes[i][j].get_xlabel() is not '':
-                    g.axes[i][j].set_xlabel(labels[j])
-                # min_tick = np.min([g.axes[i][j].get_xlim()[0], g.axes[i][j].get_ylim()[0]])
-                # print([g.axes[i][j].get_xlim()[0], g.axes[i][j].get_ylim()[0]])
-                # print([g.axes[i][j].get_xlim()[1], g.axes[i][j].get_ylim()[0]])
-                # max_xtick = np.min([g.axes[i][j].get_xlim()[1], g.axes[i][j].get_ylim()[1]])
-                # g.axes[i][j].set_xlim(min_tick,max_xtick)
-                # g.axes[i][j].set_ylim(min_tick,max_xtick)
-                # if i == j:
-                #     g.axes[i][j].hist(dist.library.iloc[:,i].sort_values(),
-                #         bins=10**np.linspace(np.log10(dist.library.iloc[:,i].min()), np.log10(dist.library.iloc[:,i].max()),10))
-                        
-        if hue is not None:
-            cax = g.fig.add_axes([1, .13, .03, .8])
-            plt.colorbar(cax=cax)
+        data = self.library[self.library.fit_SNR > 1.].dropna()
+        
+        g = sns.PairGrid(data=data, palette='Blues_d', size=5,
+            x_vars=['m_true', 'a_true'], y_vars=['a_fit', 'm_fit'])
+        g.map(plt.hexbin, gridsize=50, cmap=cmap, mincnt=1)
+        g.map_offdiag(sns.regplot, scatter=False)
+        
+        x_labels = [r'True log $m$ (Earth Masses)', r'True log $a$ (au)'] 
+        y_labels = [r'Fit log $a$ (au)', r'Fit log $m$ (Earth Masses)']
+        for y in range(len(y_labels)):
+            for x in range(len(x_labels)):
+                if g.axes[y][x].get_ylabel() is not '':
+                    g.axes[y][x].set_ylabel(y_labels[y])
+                if g.axes[y][x].get_xlabel() is not '':
+                    g.axes[y][x].set_xlabel(x_labels[x])
+                
+        cax = g.fig.add_axes([1, .13, .03, .8])
+        cbar = plt.colorbar(cax=cax)
+        cbar.ax.set_ylabel('Counts')
+        
         if save:
             g.savefig(save)
         plt.show()
     def __init__(self, directory):
         self.dir = directory
         self.collect_distribution()
-        
-# dist = Distribution('planets2/')
-# dist.plot('intrinsic', save='figures/planets2_intrinsic')
-# dist.plot('observed', save='figures/planets2_observed')
