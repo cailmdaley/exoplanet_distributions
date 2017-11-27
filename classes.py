@@ -228,7 +228,7 @@ class Distribution:
         for a in aas:
             for m in ms:
                 e=0; omega=0
-                path = self.dirs + 'm{}_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
+                path = self.dirs[0] + 'm{}_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
                 
                 if glob(path + '*') != []: #ensures lightcurves are overwritten for already-fit systems
                     print('skipping!')
@@ -300,30 +300,28 @@ class Distribution:
                 warnings.warn('{}ps{}_.txt does not exist'.format(path, i+1), UserWarning)
             
         return sys
-    def collect_distribution(self):
+    def collect_distribution(self, from_json=False):
         # multiindex = pd.MultiIndex(levels=[[]]*2, labels=[[]]*2, names=['system', 'planet'])
-        self.library = pd.DataFrame(columns=['m_true','a_true', 'm_fit', 'a_fit', 'lnZ', 'fit_SNR'], dtype=float)
-        
-        if type(self.dirs) is str: self.dirs = [self.dirs]
-        self.paths = [path[:-9] for directory in self.dirs for path in glob(directory + '/*info.json')]
-        for i, path in enumerate(self.paths):
+        if from_json is False:
+            self.library = pd.DataFrame(columns=['m_true','a_true', 'm_fit', 'a_fit', 'lnZ', 'fit_SNR'], dtype=float)
             
-            sys = self.get_system(path)
-                
-            for j, planet in enumerate(sys.planets):
-                
-                self.library.loc[10*i+j+1, ['m_true', 'a_true']] = np.log10([planet.m, planet.a])
-                if sys.analyzer:
-                    m_fit, a_fit = [sys.analyzer.get_stats()['modes'][0]['maximum']][0][:-1]
-                    # m_fit = 10**m_fit; a_fit = 10**a_fit
-                    self.library.loc[10*i+j+1, ['m_fit', 'a_fit']] =m_fit, a_fit 
-                    self.library.loc[10*i+j+1, 'lnZ'] = \
-                        sys.analyzer.get_stats()['modes'][0]['local log-evidence']
-                    self.library.loc[10*i+j+1, 'fit_SNR'] = \
-                        sys.lightcurve.loc[:,'p{}'.format(j+1)].abs().max()
-                    # self.library.loc[10*i+j+1, 'observed_SNR'] = \
-                    #     sys.lightcurve.observed.abs().max()
-                        
+            self.paths = [path[:-9] for directory in self.dirs for path in glob(directory + '/*info.json')]
+            for i, path in enumerate(self.paths):
+                sys = self.get_system(path)
+                for j, planet in enumerate(sys.planets):
+                    self.library.loc[10*i+j+1, ['m_true', 'a_true']] = np.log10([planet.m, planet.a])
+                    if sys.analyzer:
+                        m_fit, a_fit = [sys.analyzer.get_stats()['modes'][0]['maximum']][0][:-1]
+                        self.library.loc[10*i+j+1, ['m_fit', 'a_fit']] =m_fit, a_fit 
+                        self.library.loc[10*i+j+1, 'lnZ'] = \
+                            sys.analyzer.get_stats()['modes'][0]['local log-evidence']
+                        self.library.loc[10*i+j+1, 'fit_SNR'] = \
+                            sys.lightcurve.loc[:,'p{}'.format(j+1)].abs().max()
+            self.library.to_json(self.dirs[0] + '_table.json')    
+        else:
+            print(self.dirs)
+            self.library = pd.read_json(self.dirs[0] + '_table.json')
+                            
     def plot(self, kind, save=None, exclude=True):
         if kind is 'intrinsic':
             library = self.library
@@ -373,7 +371,6 @@ class Distribution:
         if save:
             g.savefig(save)
         plt.show()
-        
     def compare(self, save=None):
         fig, (ax1, ax2) = plt.subplots(2, figsize=(8,6)); sns.despine(left=True);
         sns.distplot(self.library.m_true, ax=ax1, 
@@ -403,7 +400,6 @@ class Distribution:
         if save:
             fig.savefig(save)
         plt.show()
-                
     def correlations(self, save=None):
         cmap = ListedColormap(sns.color_palette('Blues_d').as_hex()[::-1])
         
@@ -430,6 +426,9 @@ class Distribution:
         if save:
             g.savefig(save)
         plt.show()
-    def __init__(self, directories):
-        self.dirs = directories
-        self.collect_distribution()
+    def __init__(self, directories, from_json=False):
+        self.dirs = [directories] if type(directories) is str else directories
+        self.collect_distribution(from_json)
+        
+dist = Distribution('planets2', True)    
+dist.library
