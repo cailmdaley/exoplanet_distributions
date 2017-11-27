@@ -331,10 +331,12 @@ class Distribution:
             xlim = library.m_true.describe()[['min','max']] + np.array([-0.15, .15])
             ylim = library.a_true.describe()[['min','max']] + np.array([-0.05, .05])
             
-            C = self.library.fit_SNR; mincnt=None #hexbin params
-            # norm=colors.LogNorm(vmin=C.min(), vmax=C.max())
-            bins = [10**n for n in range(-1, 1 + int(np.ceil(np.log10(C.max()))))]
-            n_colors = 2*(len(bins) - 1); cbar_label = 'log Fit SNR'
+            #hexbin params
+            C = np.log10(self.library.fit_SNR) 
+            vmin = int(np.floor(C.min())); vmax = int(np.ceil(C.max()))
+            n_colors = vmax - vmin
+            cbar_label = 'log Fit SNR'
+            mincnt=None 
             
         elif kind is 'observed':
             library = self.library[self.library.fit_SNR > 1.].dropna() \
@@ -343,8 +345,11 @@ class Distribution:
             xlim = library.m_fit.describe()[['min','max']] + np.array([-0.15, .15])
             ylim = library.a_fit.describe()[['min','max']] + np.array([-0.05, .05])
             
-            C = None; mincnt=1 #hexbin params
-            bins=None; n_colors=None; cbar_label = 'Counts'
+            #hexbin params
+            C = None; mincnt=1 
+            n_colors=5; 
+            vmin = vmax = None
+            cbar_label = 'Counts'
             
         else:
             raise NameError("kind arg must be either 'observed' or 'intrinsic'")
@@ -355,7 +360,8 @@ class Distribution:
         
         # g.plot_joint(colplot, color=IOError, cmap=cmap)
         # g.plot_joint(sns.kdeplot, cmap=cmap, n_levels=5)
-        g.plot_joint(plt.hexbin, gridsize=40, C=C, bins=bins, cmap=cmap, mincnt=mincnt)
+        g.plot_joint(plt.hexbin, gridsize=45, mincnt=mincnt,
+            C=C, vmin=vmin, vmax=vmax, cmap=cmap)
         
         g.plot_marginals(sns.distplot, hist=False, kde=True, rug=False, 
             kde_kws={'shade': True})#, kde_kws={'cut':0, 'bw':0.4})
@@ -398,7 +404,6 @@ class Distribution:
             fig.savefig(save)
         plt.show()
                 
-            
     def correlations(self, save=None):
         cmap = ListedColormap(sns.color_palette('Blues_d').as_hex()[::-1])
         
@@ -406,7 +411,7 @@ class Distribution:
         
         g = sns.PairGrid(data=data, palette='Blues_d', size=5,
             x_vars=['m_true', 'a_true'], y_vars=['a_fit', 'm_fit'])
-        g.map(plt.hexbin, gridsize=50, cmap=cmap, mincnt=1)
+        g.map(plt.hexbin, gridsize=45, cmap=cmap, mincnt=1)
         g.map_offdiag(sns.regplot, scatter=False)
         
         x_labels = [r'True log $m$ (Earth Masses)', r'True log $a$ (au)'] 
