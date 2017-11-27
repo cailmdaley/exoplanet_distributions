@@ -228,7 +228,7 @@ class Distribution:
         for a in aas:
             for m in ms:
                 e=0; omega=0
-                path = self.dir + 'm{}_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
+                path = self.dirs + 'm{}_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
                 
                 if glob(path + '*') != []: #ensures lightcurves are overwritten for already-fit systems
                     print('skipping!')
@@ -304,7 +304,9 @@ class Distribution:
         # multiindex = pd.MultiIndex(levels=[[]]*2, labels=[[]]*2, names=['system', 'planet'])
         self.library = pd.DataFrame(columns=['m_true','a_true', 'm_fit', 'a_fit', 'lnZ', 'fit_SNR'], dtype=float)
         
-        self.paths = [path[:-9] for path in glob(self.dir + '/*info.json')]
+        if type(self.dirs) is str: self.dirs = [self.dirs]
+        self.paths = [path[:-9] for directory in self.dirs for path in glob(directory + '/*info.json')]
+        print(self.paths)
         for i, path in enumerate(self.paths):
             
             sys = self.get_system(path)
@@ -424,6 +426,6 @@ class Distribution:
         if save:
             g.savefig(save)
         plt.show()
-    def __init__(self, directory):
-        self.dir = directory
+    def __init__(self, directories):
+        self.dirs = directories
         self.collect_distribution()

@@ -86,7 +86,7 @@ Stellar mass is correlated with a host of other properties (for example, luminos
 As we are not able to account for these effects, fixing the stellar mass is the best way to prevent unknown biases into our sample. 
 Second, the majority of exoplanet systems detected by radial velocity lie around solar-mass stars (as seen in Figure \ref{fig: solar mass}), so fixing the stellar mass at \SI{1}{\Msun} allows better comparison between synthetic and real-world distributions.
 
-\begin{figure}[h]
+\begin{figure}
   \centering
   \includegraphics[width=0.5\linewidth]{../figures/solar_mass_detections}
   \caption{Number of exoplanet system detections as a function of stellar mass.}
@@ -104,7 +104,7 @@ As such, planets beyond \SI{10}{au} will have limited phase coverage, significan
 Finally, $t_0$ is assigned a random number between 0 and the planet's period.\footnote{I actually made a mistake in the simulations presented in this draft---all the planets have $t_0=0$. It doesn't really matter anyways, since there's only one planet in each system.}
 Planets are spaced logarithmically (in the final version..) between the boundaries given above, forming a two-dimensional logarithmic grid in $m-a$ parameter space (Figure \ref{fig: intrinsic_dist}). This allows easier comparison of the observed and intrinsic exoplanet distributions, as seen in Section \ref{section: results}.
 
-\begin{figure}[h]
+\begin{figure}
   \centering
   \includegraphics[width=0.5\linewidth]{../figures/intrinsic_dist}
   \caption{Intrinsic Exoplanet Distribution}
@@ -182,57 +182,105 @@ In both cases, coverage of the entirety of phase space is recovered.
 \label{section: fitting}
 
 With twenty years of observational data in hand, analysis can be performed. 
-To recover exoplanet properties like mass or semi-major axis we use the nested sampling fitting code \texttt{PyMultiNest} \citep{buchner14}.
-\texttt{PyMultiNest} is a Python implementation of the Bayesian inference algorithm \texttt{MULTINEST} \citep{feroz09}.
-While an in-depth discussion of the algorithm is outside the scope of this paper, we note that it directly calculates the evidence by transforming a $n$-dimensional integral over all of parameter space (i.e. the prior volume) to a 1-dimensional sum across all likelihood values. 
-This allows direct comparison between models with different parameter spaces.
-The reader is encouraged to refer to the original \texttt{MULTINEST} paper if they find themselves to be curious.
+Bayesian statistical techniques are used to `sample' parameter space and recover exoplanet properties.
+Parameter space is sampled by generating model radial velocity curves with different combinations of $m, a$ and $t_0$ ($e$ and $\omega$ are fixed to zero). 
+The creation of these curves exactly follows the procedure described in Section \ref{section: survey}, except that noise is not added.
+Model curves are then compared to the observed radial velocity curve and the log likelihood $L=-\chi^2/2$ is used to asses model quality of fit.
+Thus log likelihood values are assigned to different combinations of $m$, $a$ and $t_0$, mapping out the log likelihood function throughout the three-dimensional parameter space.
+In an ideal situation without noise, the log likelihood function in the neighborhood of the solution takes the form of a trivariate Gaussian centered at the solution.
+Even with noise added, inspection reveals the log likelihood to be generally Gaussian.
+This can be more intuitively understood if a two-dimensional parameter space is considered; here the parameter space is analogous to a topographic landscape, with regions of higher and lower likelihoods manifesting as peaks and troughs respectively.
 
-The creation of model radial velocity curves exactly follows the procedure described in Section \ref{section: survey}.
-Tens to hundreds of thousands of model curves with varying values of $m, a$ and $t_0$ ($e$ and $\omega$ are fixed to zero) are created for each system, and the log likelihood $L=-\chi^2/2$ is used to asses the quality of each model.
-This effectively maps out parameters space so that the maximum likelihood (or best fit) parameters may be estimated.
-Mass and semi-major axis are sampled logarithmically with uniform priors such that $-2.5 < \log m < \log (\SI{13}{\Mjup}) + 0.2$ and $-2.5 < \log a < 1.5$. 
-Logarithmic sampling was chosen to better cover the four and three orders of magnitude traversed by $m$ and $a$, respectively.
+The nested sampling fitting code \texttt{PyMultiNest}, a Python implementation of the Bayesian inference algorithm \texttt{MULTINEST}, is used to perform the sampling described above \citep{buchner14,feroz09}.
+While an in-depth discussion of the \texttt{MULTINEST} algorithm falls outside the scope of this paper, a brief description is provdedit essentially calculates the model evidence $Z$ (the denominator of Bayes' Theorem) by transforming a $n$-dimensional integral over all of parameter space (i.e. the prior volume) to a one-dimensional sum across all likelihood values. 
+This accomplished by distributing a set of `live' points across parameter space. 
+The point with the lowest-likelihood $L_0$ is iteratively removed from the set of live points and replaced with a new live point with likelihood $L > L_0$.
+To increase efficiency, the new point is drawn from the volume enclosed by an $n$-dimensional ellipsoid generated from the covariance matrix of the live points that provides an estimate of the iso-likelihood contour given by $L=L_0$.
+Thus the algorithm climbs through iso-likelihood contours that enclose decreasing volumes of parameter space until the remaining regions of parameter space are estimated to contribute an evidence $\Delta Z$ that is less than some predefined cutoff value. 
+In this work, the iteration stops when $\log \Delta Z <0.5$.
+
+As a final step, the evidence $Z$ is calculated by computing the 'area under the curve' from the iso-likelihood contours via the trapezium rule.
+The primary product of the nested sampling algorithm is, as described above, the evidence.
+As the evidence is the average likelihood over the prior parameter space, nested sampling allows parameter spaces defined by different hyperparameters (i.e. one planet vs. two planets) to be directly compared.
+While different sets of model hyperparameters are not considered in this work, the current fitting structure could be expanded to include comparisons between models with different numbers of planets with relative ease.
+Posterior probability distributions and the best-fit model can also be determined from the set of live and discarded points produced by nested sampling; we determine the `observed' exoplanet properties from the best-fit model parameters for each system.
+
+Mass and semi-major axis are sampled logarithmically with uniform priors.
+Logarithmic sampling was chosen to better cover the four and three orders of magnitude traversed by $m$ and $a$, respectively and the prior volume is defined so that model planet properties remain physically justifiable.
+Mass is confined to the range $\log(\SI{0.01}{\Mearth}) < \log m < \log (\SI{13}{\Mjup}) + 0.5$.
+The overall bounds for semi-major axis are $\SI{0.05}{au} < a < \SI{11}{au}$; however setting a single prior for the semi-major axis proved difficult.
+Because of the periodicity implicit in $a$ from Kepler's Third Law, for a given radial velocity curve there exists a family of `harmonics' of the correct solution.
+For example, if a planet has a semi-major axis that corresponds to a period of \SI{2}{yr}, other solutions (more precisely, Gaussian local likelihood maxima) exist at separations corresponding to periods of \SIlist[list-final-separator={, }] {0.5;1;4;6}{yr} and so on.
+This is further complicated by the fact that due to the nonlinear relationship between separation and period ($a \propto P^{2/3}$), both the spacing and standard deviation of the Gaussian solutions diminish as $a_{true}$ decreases. 
+From this we may conclude that fitting for $a$ becomes progressively harder as $a_{true} \to 0$ because the likelihood spike associated with the correct solution becomes more and more localized and thus harder for the algorithm to identify.
+
+This effect is exacerbated by the logarithmic time spacing of observations described in Section \ref{section: survey}; as seen in Figure \ref{fig: periods}, for small $a_{true}$ consecutive observations do not trace consecutive points in the planet's orbital phase space but rather take snapshots of the radial velocity at ostensibly random, unordered points throughout phase space.
+These effects combine to make the nested sampling algorithm systematically prefer higher values of $a$ in the regime $a_{true} \lesssim \SI{1}{au}$ as the harmonic solutions associated with larger $a$ tend to be broader and thus easier to find, even if they have lower log likelihoods.
+As such, a decision tree was used to determine the prior in order to mitigate this effect.
+If $a_{true} < \SI{2}{au}$, then the prior volume is defined such that $\SI{0.05}{au} < a < \SI{2.5}{au}$. 
+On the other hand, if $a_{true} > \SI{2}{au}$ the prior is defined such that $\SI{1}{au} < a < \SI{11}{au}$. 
+While this certainly not realistic---exoplanetologists will rarely know the correct regime for $a$ \textit{a priori}---it is mostly a time-saving convenience rather than a necessary sacrifice. 
+As such, I offer that this decision does not significantly affect the integrity of the project.
+
+\begin{figure}
+  \centering
+  \begin{subfigure}[b]{.45\linewidth}
+  \includegraphics[width=\linewidth]{../figures/{fit_SNR=0.5}.png}
+  \end{subfigure}
+  \begin{subfigure}[b]{.45\linewidth}
+  \includegraphics[width=\linewidth]{../figures/fit_SNR=1.png}
+  \end{subfigure}
+  \caption{Systems with model peak SNR of 0.5 (left) and 1 (right). While these examples are not necessarily representative of the entire sample, they do provide a sense of the limits of detection. The fit on the left is a non-detection, while the fit on the right lies at the lower end of the detection regime.}
+  \label{fig: detection}
+\end{figure}
 
 Exoplanet detection is determined after the data has been fit. 
-If the best-fit model peak signal-to-noise (SNR) ratio is greater than one, an exoplanet with said best-fit parameters is `detected.'
-% In 14 planet sample with true SNR < 0.5, fit SNR was always less than 1.
+If the best-fit model peak signal-to-noise (SNR) ratio is greater than one, an exoplanet with said best-fit parameters is `detected;' the observed distribution is then generated from all such detections.
+This cutoff was determined by trial and error; below this value, the best-fit model unreliably matches the data, while above the best fit model parameters are consistently in agreement with the true values.
+Figure \ref{fig: detection} shows examples of fits with model peak SNR above and below the detection limit.
+While it may seem bizarre to use the \textit{model} peak SNR rather than the data peak SNR, two factors motivate this decision.
+First, the peak SNR of the data is strongly affected by the Gaussian noise at the lower end of the detectability regime.
+If detection were determined directly from the data SNR, detection would be largely determined by the magnitude of largest of Gaussian noise added, introducing a random component into the logic of detection.
+Making use of the \textit{model} peak SNR mitigates this random component, as the fitting does an excellent job of tracing the true, noiseless peak SNR.
+As can be seen in Figure \ref{fig: intrinsic}, the model SNR = 1 cutoff is remarkably consistent and also clearly illustrates the effect of mass and semi-major axis on the model SNR.
+Second, detection is determined before fitting even takes place if the data peak SNR is used.
+This seems contrary to the philosophy of this project, which is driven by an interest in tracing the regime of exoplanet detectability as determined (in part) by fitting techniques.
 
-% Once all the systems in a distribution have been fit, we can compare the `true' exoplanet distribution to the distribution constructed from the best fit model parameters from each system. While it will be difficult to make statements about our particular exoplanet distribution, it should be possible to make general statements about the regions of exoplanet parameter space that RV observations are sensitive to.
+
+\section{Results}
+\label{section: results}
+
+\begin{figure}
+  \centering
+  
+  \begin{subfigure}[b]{.45\linewidth}
+  \includegraphics[width=\linewidth]{../figures/planets3_intrinsic}
+  \subcaption{}
+  \label{fig: intrinsic}
+  \end{subfigure}
+  \begin{subfigure}[b]{.45\linewidth}
+  \includegraphics[width=\linewidth]{../figures/planets3_observed}
+  \subcaption{}
+  \label{fig: observed}
+  \end{subfigure}
+  \caption{A comparison of the intrinsic (left) and observed (right) distributions, color-coded by the best-fit model SNR. Planets with SNR $< 1$ are counted as nondetections.}
+  \label{fig: distributions}
+\end{figure}
+
+Figure
 % 
 % \begin{enumerate}
 %   \item Once I have the two distributions, what other cool analyses could I do?
 % \end{enumerate}
 
-\section{Results}
-\label{section: results}
 
-\begin{figure}[h]
+\begin{figure}
   \centering
-  
-  \begin{subfigure}[b]{.45\linewidth}
-  \includegraphics[width=\linewidth]{../figures/planets2_intrinsic}
-  \end{subfigure}
-  \begin{subfigure}[b]{.45\linewidth}
-  \includegraphics[width=\linewidth]{../figures/planets2_observed}
-  \end{subfigure}
-  \caption{A comparison of the intrinsic (left) and observed (right) distributions, color-coded by the best-fit model SNR. Planets with SNR $< 1$ are counted as nondetections.}
-  \label{}
-\end{figure}
-
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=0.9\linewidth]{planets2_comparison}
+  \includegraphics[width=0.9\linewidth]{../figures/planets3_correlations}
   \caption{A corner-type plot showing the correlations between the intrinsic mass distribution, the intrinsic semi-major axis distribution, the fit mass distribution, and the fit semi-major axis distribution. Again, the each planet is color-coded by the best-ft model SNR. Planets with SNR $< 1$ are counted as nondetections.}
-  \label{}
+  \label{fig: correlations}
 \end{figure}
 
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=0.9\linewidth]{planets2_comparison_dropped}
-  \caption{A corner-type plot showing the correlations between the intrinsic mass distribution, the intrinsic semi-major axis distribution, the fit mass distribution, and the fit semi-major axis distribution. Again, the each planet is color-coded by the best-ft model SNR. Planets with SNR $< 1$ are counted as nondetections, and have been dropped. As such this plot shows the preliminary comparison between intrinsic and detected observations.}
-  \label{}
-\end{figure}
 
 \section{Conclusion}
 \label{section: conclusion}
