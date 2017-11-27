@@ -306,7 +306,6 @@ class Distribution:
         
         if type(self.dirs) is str: self.dirs = [self.dirs]
         self.paths = [path[:-9] for directory in self.dirs for path in glob(directory + '/*info.json')]
-        print(self.paths)
         for i, path in enumerate(self.paths):
             
             sys = self.get_system(path)
@@ -334,7 +333,7 @@ class Distribution:
             
             C = self.library.fit_SNR; mincnt=None #hexbin params
             # norm=colors.LogNorm(vmin=C.min(), vmax=C.max())
-            bins = [10**n for n in range(0, 1 + int(np.ceil(np.log10(C.max()))))]
+            bins = [10**n for n in range(-1, 1 + int(np.ceil(np.log10(C.max()))))]
             n_colors = 2*(len(bins) - 1); cbar_label = 'log Fit SNR'
             
         elif kind is 'observed':
@@ -356,7 +355,7 @@ class Distribution:
         
         # g.plot_joint(colplot, color=IOError, cmap=cmap)
         # g.plot_joint(sns.kdeplot, cmap=cmap, n_levels=5)
-        g.plot_joint(plt.hexbin, gridsize=50, C=C, bins=bins, cmap=cmap, mincnt=mincnt)
+        g.plot_joint(plt.hexbin, gridsize=40, C=C, bins=bins, cmap=cmap, mincnt=mincnt)
         
         g.plot_marginals(sns.distplot, hist=False, kde=True, rug=False, 
             kde_kws={'shade': True})#, kde_kws={'cut':0, 'bw':0.4})
