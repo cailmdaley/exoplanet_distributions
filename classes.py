@@ -15,12 +15,12 @@ from astropy.stats import LombScargle
 import subprocess as sp
 from glob import glob
 import warnings
-    
+
 noise=1.
 
 def colplot(x, y, color, **kwargs):
     plt.scatter(x, y, c=color, **kwargs)
-    
+
 class Planet:
     def __init__(self, system, m, a, e=0, omega=0, t0=0):
         """initialize a planet instance.
@@ -38,7 +38,7 @@ class Planet:
         self.e = e
         self.t0=t0
         self.omega=omega
-        
+
         self.P = system.calculate_P(self.m, self.a)
 class System:
     def __init__(self, m_star, i):
@@ -50,10 +50,10 @@ class System:
         self.m_star = m_star
         self.i = i
         self.lnlike = -1 * np.inf
-        
+
         self.planets = []
         self.dict = {}
-        
+
     def add_planet(self, m, a, e, omega=0, t0=0):
         """add a planet to current system.
         m     : mass (Earth masses)
@@ -63,7 +63,7 @@ class System:
         t0    : time since pericenter passage (days)
         """
         self.planets.append(Planet(self, m, a, e, omega, t0))
-        
+
         param_dict = {
         'm' : float(m),
         'a' : float(a),
@@ -71,9 +71,9 @@ class System:
         'omega' : float(omega),
         't0' : float(t0)}
         self.dict['p{}'.format(len(self.planets))] = param_dict
-        
+
         return self.planets[-1]
-    
+
     def calculate_P(self, m_planet, a):
         """
         calculate period of for a given planet mass and separation.
@@ -84,13 +84,13 @@ class System:
         m_planet *= u.M_earth.to('kg')
         a        *= u.au.to('m')
         m_star    = self.m_star * u.Msun.to('kg')
-        
-        P =  np.sqrt(4 * np.pi**2 * a**3 
+
+        P =  np.sqrt(4 * np.pi**2 * a**3
             / (c.G.si.value * (m_star + m_planet))) # s
         return P * u.s.to('yr')
-        
+
     def calculate_RV(self, date, m_planet, a, e, omega=0, t0=0):
-        """ calculate the radial velocity on a certain date for a given set 
+        """ calculate the radial velocity on a certain date for a given set
         of exoplanet parameters.
         date     : date of observations (days)
         m_planet : mass (Earth masses)
@@ -105,7 +105,7 @@ class System:
         a        *= u.au.to('m')
         m_star    = self.m_star * u.Msun.to('kg')
         i = np.radians(self.i)
-        
+
         M = 2 * np.pi * (date-t0) / P
         E = scipy.optimize.fsolve(lambda E: E - e*np.sin(E)-M,M)
         f = 2*np.arctan2( np.sqrt(1+e)*np.sin(E*.5), np.sqrt(1-e)*np.cos(E*.5) )
@@ -113,33 +113,33 @@ class System:
             * m_planet * np.sin(i) \
             * (np.cos(omega + f) + e * np.cos(omega))
         return RV
-    
+
     def take_lightcurve(self, days=365, n_obs=50):
         """
         'observe' lightcurve n_obs times over a given number of days. observations are spaced logarithmically between 1e15 and 1e15+days, then shifted back by 1e15 so that the first observation is at t=0. this is to provide good phase coverage for (almost) all periods. the spacing ends up being *almost* linear.
         days  : observing period (days.. lol)
         n_obs : number of observations to take
         """
-        
+
         self.lightcurve = pd.DataFrame(columns=['JD', 'intrinsic', 'observed'])
         # self.lightcurve.JD = np.logspace(np.log10(1), np.log10(days+1), n_obs) - 1
         self.lightcurve.JD = np.logspace(np.log10(1e5), np.log10(days+1e5), n_obs) - 1e5
         self.lightcurve.intrinsic = [
-            sum([self.calculate_RV(date, planet.m, planet.a, planet.e, 
-            planet.omega, planet.t0) for planet in self.planets])[0] 
+            sum([self.calculate_RV(date, planet.m, planet.a, planet.e,
+            planet.omega, planet.t0) for planet in self.planets])[0]
             for date in self.lightcurve.JD]
-        
-        
+
+
         self.lightcurve.observed = self.lightcurve.intrinsic + np.random.normal(size=n_obs) * noise
-    
+
     def make_periodogram(self):
-        
+
         frequency, power = LombScargle(self.lightcurve.JD * u.day.to('year'), self.lightcurve.observed, dy=noise).autopower()
         plt.semilogx(1./frequency, power); plt.show()
         # plt.semilogx(frequency, power); plt.show()
-        
+
     def show_lightcurve(self, model=None, period = None, save=None):
-        
+
         if period:
             self.lightcurve['Phase-Folded JD'] = self.lightcurve.JD % (period * u.yr.to('day'))
             x = 'Phase-Folded JD'
@@ -157,13 +157,13 @@ class System:
         if save:
             plt.savefig(save)
         plt.show()
-    
+
     def fit_lightcurve(self, n_planets, path, log_a_range):
         """
         fit observed lightcurve with nested sampling, as implemented by pymultinest.
         n_planets : number of planets to fit
         """
-        
+
         params = []
         for i in range(n_planets):
             params.append('planet{}_m'.format(i))
@@ -171,35 +171,35 @@ class System:
             # params.append('planet{}_e'.format(i))
             # params.append('planet{}_omega'.format(i))
             params.append('planet{}_t0'.format(i))
-        
+
         def prior(cube, ndim, nparams):
             for i in range(int(nparams/3)):
                 # log mass between log(.01) and  log(brown dwarf limit)+0.5
                 m_bd = 13*u.Mjup.to('Mearth')
-                cube[3*i]   = cube[3*i] * (np.log10(m_bd) + 0.5 + 2.) - 2. 
+                cube[3*i]   = cube[3*i] * (np.log10(m_bd) + 0.5 + 2.) - 2.
                 # log semi-major axis between log_a_range bounds
-                cube[3*i+1] = cube[3*i+1] * (log_a_range[1] - log_a_range[0]) + log_a_range[0] 
+                cube[3*i+1] = cube[3*i+1] * (log_a_range[1] - log_a_range[0]) + log_a_range[0]
                 # time since pericenter between 0 and 30 years
-                cube[3*i+2] *= 30 * u.year.to('day') 
-                
+                cube[3*i+2] *= 30 * u.year.to('day')
+
                 # cube[3*i+2] *= 1 # eccentricity between 0 and 1
                 # cube[3*i+3] *= 2*np.pi # argument of periapse between 0 and 2pi
-                
+
         def lnlike(cube, ndim, nparams):
-            
+
             model_RVs = [
-                sum([self.calculate_RV(date, 10**cube[3*i], 10**cube[3*i+1], 0, 
-                0, cube[3*i+2]) for i in range(int(nparams/3))])[0] 
+                sum([self.calculate_RV(date, 10**cube[3*i], 10**cube[3*i+1], 0,
+                0, cube[3*i+2]) for i in range(int(nparams/3))])[0]
                 for date in self.lightcurve.JD ]
-            
+
             lnlike = -0.5 * utils.chi(
-                data=self.lightcurve.observed, 
-                model=model_RVs)         
-            
+                data=self.lightcurve.observed,
+                model=model_RVs)
+
             return lnlike
-        
+
             # some informational print outs for lnlike():
-            # if lnlike > self.lnlike: 
+            # if lnlike > self.lnlike:
             #     self.lnlike = lnlike
             #     # print('model     : m={:.0}, a={:.0}, e={:.1}, omega={:.1}, t0={:.1}'.format(cube[0], cube[1], cube[2], cube[3], cube[4]))
             #     print('planet1 : m={}, a={}, e={}, omega={}, t0={}'.format(self.planets[0].m, self.planets[0].a, self.planets[0].e, self.planets[0].omega, self.planets[0].t0))
@@ -212,17 +212,17 @@ class System:
 
         pmn.run(
             n_live_points=500,
-            LogLikelihood=lnlike, 
-            Prior=prior, 
+            LogLikelihood=lnlike,
+            Prior=prior,
             n_dims=len(params),
             wrapped_params = [0,0,1] * int(len(params)/3),
-            outputfiles_basename=path, 
+            outputfiles_basename=path,
             resume=True, verbose=True)
         json.dump(params,open(path + 'params.json','w'))
 
-                
+
 class Distribution:
-    
+
     def fit(self, ms, aas, es=None, omegas=None):
         # a between 0 and 10 au
         # m between 0 and 13 Mjup
@@ -230,81 +230,81 @@ class Distribution:
             for m in ms:
                 e=0; omega=0
                 path = self.dirs[0] + 'm{}_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
-                
+
                 if glob(path + '*') != []: #ensures lightcurves are overwritten for already-fit systems
                     print('skipping!')
                     continue
-                
+
                 sys = System(1, 90)
                 planet = sys.add_planet(m=m, a=a, e=e, omega=omega, t0=0)
-                
+
                 # hacky way to set orbital phase shift within period bounds
-                planet.t0 = np.random.rand() * planet.P; 
+                planet.t0 = np.random.rand() * planet.P;
                 sys.dict['p1']['t0'] = planet.t0
-                
+
                 sys.take_lightcurve(days=20*u.yr.to('day'), n_obs=50)
                 sys.lightcurve.to_json(path+'_lightcurve.json')
                 json.dump(sys.dict,open(path + '_info.json','w'))
                 print(sys.dict)
-            
+
                 n_planets = 1
                 if 0 <= a < 0.1: log_a_range = np.log10([0.005, 0.15])
-                elif 0.1 <= a < 2.: log_a_range = np.log10([0.05, 2.5]) 
-                else: np.log10([1, 11])
+                elif 0.1 <= a < 2.: log_a_range = np.log10([0.05, 2.5])
+                else: log_a_range =  np.log10([1, 11])
                 sys.fit_lightcurve(
-                    n_planets=1, 
-                    path=path+'_ps{}_'.format(n_planets), 
+                    n_planets=1,
+                    path=path+'_ps{}_'.format(n_planets),
                     log_a_range=log_a_range)
                 # sys.analyzer = pmn.Analyzer(
-                #     n_planets*3, 
+                #     n_planets*3,
                 #     outputfiles_basename=path+'_ps{}_'.format(n_planets))
                 # m_fit, a_fit, t0_fit = sys.analyzer.get_best_fit()['parameters']
     def get_system(self, path):
         sys = System(m_star=1, i=90)
-        
+
         try:
             sys.info = json.load(open(path + 'info.json'))
         except IOError:
             warnings.warn('{}info.json does not exist'.format(path), UserWarning)
-        
+
         try:
             sys.lightcurve = pd.read_json(path+'lightcurve.json')
         except ValueError:
             warnings.warn('{}lightcurve.json does not exist'.format(path), UserWarning)
-        
+
         for i, planet in enumerate(sys.info):
             sys.add_planet(m=sys.info[planet]['m'], a = sys.info[planet]['a'], e=sys.info[planet]['e'],
                 omega=sys.info[planet]['omega'], t0=sys.info[planet]['t0'])
-                
+
             try:
                 params = json.load(open(path + 'ps{}_params.json'.format(i+1)))
             except IOError:
                 warnings.warn('{}ps{}_params.json does not exist'.format(path, i+1), UserWarning)
             try:
-                sys.analyzer = pmn.Analyzer(len(sys.info) * 3, 
+                sys.analyzer = pmn.Analyzer(len(sys.info) * 3,
                     outputfiles_basename = path + 'ps{}_'.format(i+1))
                 bf_params = sys.analyzer.get_best_fit()['parameters']
                 # model_RVs = [
-                #     sum([sys.calculate_RV(date, bf_params[3*i], bf_params[3*i+1], 
-                #     0, 0, bf_params[3*i+2]) 
-                #     for i in range(len(sys.info))])[0] 
+                #     sum([sys.calculate_RV(date, bf_params[3*i], bf_params[3*i+1],
+                #     0, 0, bf_params[3*i+2])
+                #     for i in range(len(sys.info))])[0]
                 #     for date in sys.lightcurve.JD ]
                 model_RVs = [
-                    sum([sys.calculate_RV(date, 10**bf_params[3*i], 10**bf_params[3*i+1], 
-                    0, 0, bf_params[3*i+2]) 
-                    for i in range(len(sys.info))])[0] 
+                    sum([sys.calculate_RV(date, 10**bf_params[3*i], 10**bf_params[3*i+1],
+                    0, 0, bf_params[3*i+2])
+                    for i in range(len(sys.info))])[0]
                     for date in sys.lightcurve.JD ]
                 sys.lightcurve[planet] = model_RVs
             except (IOError, IndexError):
                 sys.analyzer = None
                 warnings.warn('{}ps{}_.txt does not exist'.format(path, i+1), UserWarning)
-            
+
         return sys
     def collect_distribution(self, from_json=False):
         # multiindex = pd.MultiIndex(levels=[[]]*2, labels=[[]]*2, names=['system', 'planet'])
         if from_json is False:
             self.library = pd.DataFrame(columns=['m_true','a_true', 'm_fit', 'a_fit', 'lnZ', 'fit_SNR'], dtype=float)
-            
+
             self.paths = [path[:-9] for directory in self.dirs for path in glob(directory + '/*info.json')]
             for i, path in enumerate(self.paths):
                 sys = self.get_system(path)
@@ -312,12 +312,12 @@ class Distribution:
                     self.library.loc[10*i+j+1, ['m_true', 'a_true']] = np.log10([planet.m, planet.a])
                     if sys.analyzer:
                         m_fit, a_fit = [sys.analyzer.get_stats()['modes'][0]['maximum']][0][:-1]
-                        self.library.loc[10*i+j+1, ['m_fit', 'a_fit']] =m_fit, a_fit 
+                        self.library.loc[10*i+j+1, ['m_fit', 'a_fit']] =m_fit, a_fit
                         self.library.loc[10*i+j+1, 'lnZ'] = \
                             sys.analyzer.get_stats()['modes'][0]['local log-evidence']
                         self.library.loc[10*i+j+1, 'fit_SNR'] = \
                             sys.lightcurve.loc[:,'p{}'.format(j+1)].abs().max()
-            self.library.to_json(self.dirs[0] + '_table.json')    
+            self.library.to_json(self.dirs[0] + '_table.json')
         else:
             self.library = pd.read_json(self.dirs[0] + '_table.json')
     def plot(self, kind, save=None, exclude=True):
@@ -326,65 +326,65 @@ class Distribution:
             x = 'm_true'; y = 'a_true'
             xlim = library.m_true.describe()[['min','max']] + np.array([-0.15, .15])
             ylim = library.a_true.describe()[['min','max']] + np.array([-0.05, .05])
-            
+
             #hexbin params
-            C = np.log10(self.library.fit_SNR) 
+            C = np.log10(self.library.fit_SNR)
             vmin = int(np.floor(C.min())); vmax = int(np.ceil(C.max()))
             n_colors = vmax - vmin
             cbar_label = 'log Model SNR'
-            mincnt=None 
-            
+            mincnt=None
+
         elif kind is 'observed':
             library = self.library.dropna()
-            library = library[library.fit_SNR > 1.] 
+            library = library[library.fit_SNR > 1.]
             x = 'm_fit'; y = 'a_fit'
             xlim = library.m_fit.describe()[['min','max']] + np.array([-0.15, .15])
             ylim = library.a_fit.describe()[['min','max']] + np.array([-0.05, .05])
-            
+
             #hexbin params
-            C = None; mincnt=1 
-            n_colors=256; 
+            C = None; mincnt=1
+            n_colors=256;
             vmin = vmax = None
             cbar_label = 'Counts'
-            
+
         else:
             raise NameError("kind arg must be either 'observed' or 'intrinsic'")
-        
+
         g = sns.JointGrid(data=library, x=x, y=y, xlim=xlim, ylim=ylim)
         g.set_axis_labels(xlabel=r'log $m$ ($M_\oplus$)', ylabel='log $a$ (au)')
         cmap = ListedColormap(sns.color_palette('Blues_d', n_colors).as_hex()[::-1])
-        
+
         # g.plot_joint(colplot, color=IOError, cmap=cmap)
         # g.plot_joint(sns.kdeplot, cmap=cmap, n_levels=5)
         g.plot_joint(plt.hexbin, gridsize=50, mincnt=mincnt,
             C=C, vmin=vmin, vmax=vmax, cmap=cmap)
-        
-        g.plot_marginals(sns.distplot, hist=False, kde=True, rug=False, 
+
+        g.plot_marginals(sns.distplot, hist=False, kde=True, rug=False,
             kde_kws={'shade': True})#, kde_kws={'cut':0, 'bw':0.4})
-            
+
         cax = g.fig.add_axes([1, .095, .03, .75])
         cbar = plt.colorbar(cax=cax)
         cbar.ax.set_ylabel(cbar_label)
-            
+
         if save:
             g.savefig(save)
         plt.show()
     def compare(self, save=None):
         fig, (ax1, ax2) = plt.subplots(2, figsize=(8,6)); sns.despine(left=True);
         library = self.library.dropna()
-        sns.distplot(library.m_true, ax=ax1, 
+        sns.distplot(library.m_true, ax=ax1,
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'True $m$')
-        sns.distplot(library[library.fit_SNR > 1.].m_fit, ax=ax1, 
+        sns.distplot(library[library.fit_SNR > 1.].m_fit, ax=ax1,
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'Fit $m$', color='red', axlabel=r'log $m$ ($M_\oplus$)')
-        sns.distplot(library.a_true, ax=ax2, 
+        sns.distplot(library.a_true, ax=ax2,
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'True $a$')
-        sns.distplot(library[library.fit_SNR > 1.].a_fit, ax=ax2, 
+        sns.distplot(library[library.fit_SNR > 1.].a_fit, ax=ax2,
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'Fit $a$', color = 'red', axlabel=r'log $a$ (au)')    
-            
+            label=r'Fit $a$', color = 'red', axlabel=r'log $a$ (au)')
+
         # add common ylabel
         fig.add_subplot(111, frameon=False)
         plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
@@ -394,47 +394,47 @@ class Distribution:
         # get rid of meaningless y axis labels
         for ax in [ax1, ax2]:
             ax.tick_params(axis='y', which='both', labelcolor='none', left='off')
-        plt.tight_layout() 
-        
+        plt.tight_layout()
+
         if save:
             fig.savefig(save)
         plt.show()
     def correlations(self, save=None):
         data = self.library[self.library.fit_SNR > 1.].dropna()
-        
+
         h1 = plt.hexbin(data.m_true, data.m_fit, gridsize=50, mincnt=1)
         h2 = plt.hexbin(data.a_true, data.a_fit, gridsize=50, mincnt=1)
         vmin = np.min([h1.properties()['clim'][0], h2.properties()['clim'][0]])
         vmax = np.max([h1.properties()['clim'][1], h2.properties()['clim'][1]])
         plt.clf()
-        
+
         cmap = ListedColormap(sns.color_palette('Blues_d', 256).as_hex()[::-1])
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8,4))
-        
+
         ax1.set(xlabel = r'True log $m$ ($M_\oplus$)', ylabel = r'Fit log $m$ ($M_\oplus$)',
             aspect='equal')
-        h1 = ax1.hexbin(data.m_true, data.m_fit, gridsize=50, 
+        h1 = ax1.hexbin(data.m_true, data.m_fit, gridsize=50,
             cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1)
         m_range = np.linspace(data.m_true.min(), data.m_true.max(), 1000)
         ax1.plot(m_range, m_range, 'r--', lw=1)
-            
+
         ax2.set(xlabel = r'True log $a$ (au)', ylabel = r'Fit log $a$ (au)',
             aspect='equal')
         h2 = ax2.hexbin(data.a_true, data.a_fit, gridsize=50,
             cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1)
         a_range = np.linspace(data.a_true.min(), data.a_true.max(), 1000)
         ax2.plot(a_range, a_range, 'r--', lw=1)
-            
+
         sns.despine()
         plt.tight_layout()
         divider = make_axes_locatable(ax2)
         cax = divider.append_axes("right", size="5%", pad=0.5)
         cbar = plt.colorbar(h2, cax=cax)
         cbar.ax.set_ylabel('Counts')
-        
+
         if save:
             fig.savefig(save)
         plt.show()
     def __init__(self, directories):
         self.dirs = [directories] if type(directories) is str else directories
-        
+
