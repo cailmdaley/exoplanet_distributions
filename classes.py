@@ -229,9 +229,7 @@ class Distribution:
         for a in aas:
             for m in ms:
                 e=0; omega=0
-                
-                #WATCH OUT THIS COULD BITE
-                path = self.dirs[0] + 'm{}*_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
+                path = self.dirs[0] + 'm{}_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
                 
                 if glob(path + '*') != []: #ensures lightcurves are overwritten for already-fit systems
                     print('skipping!')
