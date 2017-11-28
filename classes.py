@@ -229,7 +229,9 @@ class Distribution:
         for a in aas:
             for m in ms:
                 e=0; omega=0
-                path = self.dirs[0] + 'm{}_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
+                
+                #WATCH OUT THIS COULD BITE
+                path = self.dirs[0] + 'm{}*_a{}_e{}_omega{:.1f}'.format(m,a,e,omega)
                 
                 if glob(path + '*') != []: #ensures lightcurves are overwritten for already-fit systems
                     print('skipping!')
@@ -335,22 +337,22 @@ class Distribution:
             mincnt=None 
             
         elif kind is 'observed':
-            library = self.library.dropna()
-            library = library[library.fit_SNR > 1.] 
+            library = self.library[self.library.fit_SNR > 1.].dropna() \
+                if exclude is True else self.library.dropna()
             x = 'm_fit'; y = 'a_fit'
             xlim = library.m_fit.describe()[['min','max']] + np.array([-0.15, .15])
             ylim = library.a_fit.describe()[['min','max']] + np.array([-0.05, .05])
             
             #hexbin params
             C = None; mincnt=1 
-            n_colors=256; 
+            n_colors=5; 
             vmin = vmax = None
             cbar_label = 'Counts'
             
         else:
             raise NameError("kind arg must be either 'observed' or 'intrinsic'")
         
-        g = sns.JointGrid(data=library, x=x, y=y, xlim=xlim, ylim=ylim)
+        g = sns.JointGrid(data=self.library, x=x, y=y, xlim=xlim, ylim=ylim)
         g.set_axis_labels(xlabel=r'log $m$ ($M_\oplus$)', ylabel='log $a$ (au)')
         cmap = ListedColormap(sns.color_palette('Blues_d', n_colors).as_hex()[::-1])
         
@@ -371,19 +373,18 @@ class Distribution:
         plt.show()
     def compare(self, save=None):
         fig, (ax1, ax2) = plt.subplots(2, figsize=(8,6)); sns.despine(left=True);
-        library = self.library.dropna()
-        sns.distplot(library.m_true, ax=ax1, 
+        sns.distplot(self.library.m_true, ax=ax1, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'True $m$')
-        sns.distplot(library[library.fit_SNR > 1.].m_fit, ax=ax1, 
+        sns.distplot(self.library[self.library.fit_SNR > 1.].m_fit, ax=ax1, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'Fit $m$', color='red', axlabel=r'log $m$ ($M_\oplus$)')
-        sns.distplot(library.a_true, ax=ax2, 
+            label=r'Fit $m$', axlabel=r'log $m$ ($M_\oplus$)')
+        sns.distplot(self.library.a_true, ax=ax2, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'True $a$')
-        sns.distplot(library[library.fit_SNR > 1.].a_fit, ax=ax2, 
+        sns.distplot(self.library[self.library.fit_SNR > 1.].a_fit, ax=ax2, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'Fit $a$', color = 'red', axlabel=r'log $a$ (au)')    
+            label=r'Fit $a$', axlabel=r'log $a$ (au)')    
             
         # add common ylabel
         fig.add_subplot(111, frameon=False)
@@ -408,22 +409,18 @@ class Distribution:
         vmax = np.max([h1.properties()['clim'][1], h2.properties()['clim'][1]])
         plt.clf()
         
-        cmap = ListedColormap(sns.color_palette('Blues_d', 256).as_hex()[::-1])
+        cmap = ListedColormap(sns.color_palette('Blues_d').as_hex()[::-1])
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8,4))
         
-        ax1.set(xlabel = r'True log $m$ ($M_\oplus$)', ylabel = r'Fit log $m$ ($M_\oplus$)',
-            aspect='equal')
+        ax1.set(xlabel = r'True log $m$ ($M_\oplus$)', ylabel = r'Fit log $m$ ($M_\oplus$)')
         h1 = ax1.hexbin(data.m_true, data.m_fit, gridsize=50, 
             cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1)
-        m_range = np.linspace(data.m_true.min(), data.m_true.max(), 1000)
-        ax1.plot(m_range, m_range, 'r--', lw=1)
+        m_range = np.arange(data.m_true.min(), data.m_true.max())
+        ax1.plot()
             
-        ax2.set(xlabel = r'True log $a$ (au)', ylabel = r'Fit log $a$ (au)',
-            aspect='equal')
+        ax2.set(xlabel = r'True log $a$ (au)', ylabel = r'Fit log $a$ (au)')
         h2 = ax2.hexbin(data.a_true, data.a_fit, gridsize=50,
             cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1)
-        a_range = np.linspace(data.a_true.min(), data.a_true.max(), 1000)
-        ax2.plot(a_range, a_range, 'r--', lw=1)
             
         sns.despine()
         plt.tight_layout()
@@ -435,6 +432,7 @@ class Distribution:
         if save:
             fig.savefig(save)
         plt.show()
-    def __init__(self, directories):
+    def __init__(self, directories, from_json=False):
         self.dirs = [directories] if type(directories) is str else directories
+        self.collect_distribution(from_json)
         
