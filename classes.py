@@ -283,7 +283,7 @@ class Distribution:
             try:
                 sys.analyzer = pmn.Analyzer(len(sys.info) * 3,
                     outputfiles_basename = path + 'ps{}_'.format(i+1))
-                bf_params = sys.analyzer.get_best_fit()['parameters']
+                bf_params = [sys.analyzer.get_stats()['modes'][0]['maximum']][0]
                 # model_RVs = [
                 #     sum([sys.calculate_RV(date, bf_params[3*i], bf_params[3*i+1],
                 #     0, 0, bf_params[3*i+2])
