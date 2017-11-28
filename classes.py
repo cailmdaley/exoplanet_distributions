@@ -4,6 +4,7 @@ import seaborn as sns
 import scipy.optimize
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.colors as colors
 from astropy import units as u
 import astropy.constants as c
@@ -258,7 +259,6 @@ class Distribution:
                 #     n_planets*3, 
                 #     outputfiles_basename=path+'_ps{}_'.format(n_planets))
                 # m_fit, a_fit, t0_fit = sys.analyzer.get_best_fit()['parameters']
-    
     def get_system(self, path):
         sys = System(m_star=1, i=90)
         
@@ -319,9 +319,7 @@ class Distribution:
                             sys.lightcurve.loc[:,'p{}'.format(j+1)].abs().max()
             self.library.to_json(self.dirs[0] + '_table.json')    
         else:
-            print(self.dirs)
             self.library = pd.read_json(self.dirs[0] + '_table.json')
-                            
     def plot(self, kind, save=None, exclude=True):
         if kind is 'intrinsic':
             library = self.library
@@ -333,7 +331,7 @@ class Distribution:
             C = np.log10(self.library.fit_SNR) 
             vmin = int(np.floor(C.min())); vmax = int(np.ceil(C.max()))
             n_colors = vmax - vmin
-            cbar_label = 'log Fit SNR'
+            cbar_label = 'log Model SNR'
             mincnt=None 
             
         elif kind is 'observed':
@@ -345,7 +343,7 @@ class Distribution:
             
             #hexbin params
             C = None; mincnt=1 
-            n_colors=5; 
+            n_colors=256; 
             vmin = vmax = None
             cbar_label = 'Counts'
             
@@ -358,7 +356,7 @@ class Distribution:
         
         # g.plot_joint(colplot, color=IOError, cmap=cmap)
         # g.plot_joint(sns.kdeplot, cmap=cmap, n_levels=5)
-        g.plot_joint(plt.hexbin, gridsize=45, mincnt=mincnt,
+        g.plot_joint(plt.hexbin, gridsize=50, mincnt=mincnt,
             C=C, vmin=vmin, vmax=vmax, cmap=cmap)
         
         g.plot_marginals(sns.distplot, hist=False, kde=True, rug=False, 
@@ -378,13 +376,13 @@ class Distribution:
             label=r'True $m$')
         sns.distplot(self.library[self.library.fit_SNR > 1.].m_fit, ax=ax1, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'Fit $m$', axlabel=r'log $m$ ($M_\oplus$)')
+            label=r'Fit $m$', color='red', axlabel=r'log $m$ ($M_\oplus$)')
         sns.distplot(self.library.a_true, ax=ax2, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'True $a$')
         sns.distplot(self.library[self.library.fit_SNR > 1.].a_fit, ax=ax2, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'Fit $a$', axlabel=r'log $a$ (au)')    
+            label=r'Fit $a$', color = 'red', axlabel=r'log $a$ (au)')    
             
         # add common ylabel
         fig.add_subplot(111, frameon=False)
@@ -401,34 +399,42 @@ class Distribution:
             fig.savefig(save)
         plt.show()
     def correlations(self, save=None):
-        cmap = ListedColormap(sns.color_palette('Blues_d').as_hex()[::-1])
-        
         data = self.library[self.library.fit_SNR > 1.].dropna()
         
-        g = sns.PairGrid(data=data, palette='Blues_d', size=5,
-            x_vars=['m_true', 'a_true'], y_vars=['a_fit', 'm_fit'])
-        g.map(plt.hexbin, gridsize=45, cmap=cmap, mincnt=1)
-        g.map_offdiag(sns.regplot, scatter=False)
+        h1 = plt.hexbin(data.m_true, data.m_fit, gridsize=50, mincnt=1)
+        h2 = plt.hexbin(data.a_true, data.a_fit, gridsize=50, mincnt=1)
+        vmin = np.min([h1.properties()['clim'][0], h2.properties()['clim'][0]])
+        vmax = np.max([h1.properties()['clim'][1], h2.properties()['clim'][1]])
+        plt.clf()
         
-        x_labels = [r'True log $m$ (Earth Masses)', r'True log $a$ (au)'] 
-        y_labels = [r'Fit log $a$ (au)', r'Fit log $m$ (Earth Masses)']
-        for y in range(len(y_labels)):
-            for x in range(len(x_labels)):
-                if g.axes[y][x].get_ylabel() is not '':
-                    g.axes[y][x].set_ylabel(y_labels[y])
-                if g.axes[y][x].get_xlabel() is not '':
-                    g.axes[y][x].set_xlabel(x_labels[x])
-                
-        cax = g.fig.add_axes([1, .13, .03, .8])
-        cbar = plt.colorbar(cax=cax)
+        cmap = ListedColormap(sns.color_palette('Blues_d', 256).as_hex()[::-1])
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8,4))
+        
+        ax1.set(xlabel = r'True log $m$ ($M_\oplus$)', ylabel = r'Fit log $m$ ($M_\oplus$)',
+            aspect='equal')
+        h1 = ax1.hexbin(data.m_true, data.m_fit, gridsize=50, 
+            cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1)
+        m_range = np.linspace(data.m_true.min(), data.m_true.max(), 1000)
+        ax1.plot(m_range, m_range, 'r--', lw=1)
+            
+        ax2.set(xlabel = r'True log $a$ (au)', ylabel = r'Fit log $a$ (au)',
+            aspect='equal')
+        h2 = ax2.hexbin(data.a_true, data.a_fit, gridsize=50,
+            cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1)
+        a_range = np.linspace(data.a_true.min(), data.a_true.max(), 1000)
+        ax2.plot(a_range, a_range, 'r--', lw=1)
+            
+        sns.despine()
+        plt.tight_layout()
+        divider = make_axes_locatable(ax2)
+        cax = divider.append_axes("right", size="5%", pad=0.5)
+        cbar = plt.colorbar(h2, cax=cax)
         cbar.ax.set_ylabel('Counts')
         
         if save:
-            g.savefig(save)
+            fig.savefig(save)
         plt.show()
     def __init__(self, directories, from_json=False):
         self.dirs = [directories] if type(directories) is str else directories
         self.collect_distribution(from_json)
         
-dist = Distribution('planets2', True)    
-dist.library

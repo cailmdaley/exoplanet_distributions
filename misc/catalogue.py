@@ -7,9 +7,13 @@ import astrocail.utils as utils
 %reload_ext autoreload
 %autoreload 2
 
-planets = pd.read_csv('planets.csv', skiprows=range(406), index_col=0); planets
-
+print(planets.columns[:])
+planets = pd.read_csv('planets.csv', skiprows=range(406), index_col=0); 
 rv_planets = planets[planets['pl_discmethod'] == 'Radial Velocity']
+# planets.pl_msinij.dropna().shape
+# planets.pl_orbsmax.min()
+# planets.plot('scatter' x = )
+
 rv_planets.reset_index(inplace=True)
 
 rv_planets.plot(kind='scatter', x='st_dist', y='pl_rvamperr1', loglog=True); plt.show()
