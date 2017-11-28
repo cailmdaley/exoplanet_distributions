@@ -1,11 +1,11 @@
 import classes
-%reload_ext autoreload
-%autoreload 2
+#%reload_ext autoreload
+#%autoreload 2
 
 # dist = classes.Distribution(['planets3_bottomup', '../exo_project/planets3'])
 
 dist = classes.Distribution('planets3_bottomup')
-dist.collect_distribution()
+dist.collect_distribution(from_json=False)
 
 # lib = dist.library
 # (lib.m_true - lib.m_fit).mean()
