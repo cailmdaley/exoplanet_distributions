@@ -1,5 +1,7 @@
 import pandas as pd
+from astropy import units as u
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 import numpy as np
 import seaborn as sns
 import astrocail.mcmc as mcmc
@@ -8,13 +10,46 @@ import astrocail.utils as utils
 %autoreload 2
 
 print(planets.columns[:])
-planets = pd.read_csv('planets.csv', skiprows=range(406), index_col=0); 
-rv_planets = planets[planets['pl_discmethod'] == 'Radial Velocity']
-# planets.pl_msinij.dropna().shape
-# planets.pl_orbsmax.min()
-# planets.plot('scatter' x = )
 
-rv_planets.reset_index(inplace=True)
+planets = pd.read_csv('planets.csv', skiprows=range(406), index_col=0); 
+rv_planets = planets[planets['pl_discmethod'] == 'radial velocity']
+
+plot_dist()
+def plot_dist():
+    df = np.log10(rv_planets.loc[:, ['pl_msinij', 'pl_orbsmax'] ])
+    df.columns = ['m', 'a']
+    df.m += np.log10(u.Mjup.to('Mearth'))
+
+    x = 'm'; y = 'a'
+    xlim = df.m.describe()[['min','max']] + np.array([-0.15, .15])
+    ylim = df.a.describe()[['min','max']] + np.array([-0.05, .05])
+
+    #hexbin params
+    C = None; mincnt=1 
+    n_colors=5; 
+    vmin = vmax = None
+    cbar_label = 'Counts'
+
+    g = sns.JointGrid(data=df, x=x, y=y, xlim=xlim, ylim=ylim)
+    g.set_axis_labels(xlabel=r'log $m$ ($M_\oplus$)', ylabel='log $a$ (au)')
+    cmap = ListedColormap(sns.color_palette('Blues_d', n_colors).as_hex()[::-1])
+
+    g.plot_joint(plt.hexbin, gridsize=50, mincnt=mincnt,
+    C=C, vmin=vmin, vmax=vmax, cmap=cmap)
+
+    g.plot_marginals(sns.distplot, hist=False, kde=True, rug=False, 
+    kde_kws={'shade': True})#, kde_kws={'cut':0, 'bw':0.4})
+
+    cax = g.fig.add_axes([1, .095, .03, .75])
+    cbar = plt.colorbar(cax=cax)
+    cbar.ax.set_ylabel(cbar_label)
+    cbar.set_ticks([1,2,3,4,5])
+    plt.show()
+
+
+df.plot(kind='scatter', x='m', y='a'); plt.show()
+
+rv_planets.reset_index(inplace=true)
 
 rv_planets.plot(kind='scatter', x='st_dist', y='pl_rvamperr1', loglog=True); plt.show()
 

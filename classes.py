@@ -335,8 +335,8 @@ class Distribution:
             mincnt=None 
             
         elif kind is 'observed':
-            library = self.library[self.library.fit_SNR > 1.].dropna() \
-                if exclude is True else self.library.dropna()
+            library = self.library.dropna()
+            library = library[library.fit_SNR > 1.] 
             x = 'm_fit'; y = 'a_fit'
             xlim = library.m_fit.describe()[['min','max']] + np.array([-0.15, .15])
             ylim = library.a_fit.describe()[['min','max']] + np.array([-0.05, .05])
@@ -350,7 +350,7 @@ class Distribution:
         else:
             raise NameError("kind arg must be either 'observed' or 'intrinsic'")
         
-        g = sns.JointGrid(data=self.library, x=x, y=y, xlim=xlim, ylim=ylim)
+        g = sns.JointGrid(data=library, x=x, y=y, xlim=xlim, ylim=ylim)
         g.set_axis_labels(xlabel=r'log $m$ ($M_\oplus$)', ylabel='log $a$ (au)')
         cmap = ListedColormap(sns.color_palette('Blues_d', n_colors).as_hex()[::-1])
         
@@ -371,16 +371,17 @@ class Distribution:
         plt.show()
     def compare(self, save=None):
         fig, (ax1, ax2) = plt.subplots(2, figsize=(8,6)); sns.despine(left=True);
-        sns.distplot(self.library.m_true, ax=ax1, 
+        library = self.library.dropna()
+        sns.distplot(library.m_true, ax=ax1, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'True $m$')
-        sns.distplot(self.library[self.library.fit_SNR > 1.].m_fit, ax=ax1, 
+        sns.distplot(library[library.fit_SNR > 1.].m_fit, ax=ax1, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'Fit $m$', color='red', axlabel=r'log $m$ ($M_\oplus$)')
-        sns.distplot(self.library.a_true, ax=ax2, 
+        sns.distplot(library.a_true, ax=ax2, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'True $a$')
-        sns.distplot(self.library[self.library.fit_SNR > 1.].a_fit, ax=ax2, 
+        sns.distplot(library[library.fit_SNR > 1.].a_fit, ax=ax2, 
             rug=False, hist=False, kde=True, kde_kws={'shade': True},
             label=r'Fit $a$', color = 'red', axlabel=r'log $a$ (au)')    
             
@@ -434,7 +435,6 @@ class Distribution:
         if save:
             fig.savefig(save)
         plt.show()
-    def __init__(self, directories, from_json=False):
+    def __init__(self, directories):
         self.dirs = [directories] if type(directories) is str else directories
-        self.collect_distribution(from_json)
         
