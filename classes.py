@@ -329,7 +329,8 @@ class Distribution:
 
             #hexbin params
             C = np.log10(self.library.fit_SNR)
-            vmin = int(np.floor(C.min())); vmax = int(np.ceil(C.max()))
+            vmin = int(np.floor(C.min()))
+            vmax = int(np.ceil(C.max()))
             n_colors = vmax - vmin
             cbar_label = 'log Model SNR'
             mincnt=None
@@ -343,7 +344,7 @@ class Distribution:
 
             #hexbin params
             C = None; mincnt=1
-            n_colors=256;
+            n_colors=8;
             vmin = vmax = None
             cbar_label = 'Counts'
 
@@ -370,30 +371,33 @@ class Distribution:
             g.savefig(save)
         plt.show()
     def compare(self, save=None):
-        fig, (ax1, ax2) = plt.subplots(2, figsize=(8,6)); sns.despine(left=True);
+        fig, (ax1, ax2) = plt.subplots(2, figsize=(8,6)); sns.despine();
         library = self.library.dropna()
+        m_bins = np.arange(library.loc[:,['m_fit', 'm_true']].min().min(), library.loc[:,['m_fit', 'm_true']].max().max(), 0.047)[1:]
+        a_bins = np.arange(-1, library.loc[:,['a_fit', 'a_true']].max().max(), 0.02)
         sns.distplot(library.m_true, ax=ax1,
-            rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'True $m$')
+            hist=True, kde=False, bins=m_bins,
+            label=r'Intrinsic')
         sns.distplot(library[library.fit_SNR > 1.].m_fit, ax=ax1,
-            rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'Fit $m$', color='red', axlabel=r'log $m$ ($M_\oplus$)')
+            rug=False, hist=True, kde=False, bins=m_bins,
+            label=r'Observed', color='red', axlabel=r'log $m$ ($M_\oplus$)')
         sns.distplot(library.a_true, ax=ax2,
-            rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'True $a$')
+            rug=False, hist=True, kde=False, bins=a_bins)
         sns.distplot(library[library.fit_SNR > 1.].a_fit, ax=ax2,
-            rug=False, hist=False, kde=True, kde_kws={'shade': True},
-            label=r'Fit $a$', color = 'red', axlabel=r'log $a$ (au)')
+            rug=False, hist=True, kde=False, bins=a_bins,
+            color = 'red', axlabel=r'log $a$ (au)')
+        fig.legend()
 
+            
         # add common ylabel
         fig.add_subplot(111, frameon=False)
         plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
         plt.grid(False)
-        plt.ylabel("Normalized Probability Density")
+        plt.ylabel("Counts")
         # ax1.set_title('Mass'); ax2.set_title('Semi-major axis')
         # get rid of meaningless y axis labels
-        for ax in [ax1, ax2]:
-            ax.tick_params(axis='y', which='both', labelcolor='none', left='off')
+        # for ax in [ax1, ax2]:
+        #     ax.tick_params(axis='y', which='both', labelcolor='none', left='off')
         plt.tight_layout()
 
         if save:
@@ -409,32 +413,30 @@ class Distribution:
         plt.clf()
 
         cmap = ListedColormap(sns.color_palette('Blues_d', 256).as_hex()[::-1])
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8,4))
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9,4))
 
-        ax1.set(xlabel = r'True log $m$ ($M_\oplus$)', ylabel = r'Fit log $m$ ($M_\oplus$)',
-            aspect='equal')
+        ax1.set(xlabel = r'True log $m$ ($M_\oplus$)', ylabel = r'Fit log $m$ ($M_\oplus$)')
         h1 = ax1.hexbin(data.m_true, data.m_fit, gridsize=50,
             cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1)
         m_range = np.linspace(data.m_true.min(), data.m_true.max(), 1000)
-        ax1.plot(m_range, m_range, 'r--', lw=1)
+        ax1.plot(m_range, m_range, 'r--', lw=1, alpha=0.5)
 
-        ax2.set(xlabel = r'True log $a$ (au)', ylabel = r'Fit log $a$ (au)',
-            aspect='equal')
+        ax2.set(xlabel = r'True log $a$ (au)', ylabel = r'Fit log $a$ (au)')
         h2 = ax2.hexbin(data.a_true, data.a_fit, gridsize=50,
             cmap=cmap, vmin=vmin, vmax=vmax, mincnt=1)
         a_range = np.linspace(data.a_true.min(), data.a_true.max(), 1000)
-        ax2.plot(a_range, a_range, 'r--', lw=1)
+        ax2.plot(a_range, a_range, 'r--', lw=1, alpha=0.5)
 
         sns.despine()
         plt.tight_layout()
         divider = make_axes_locatable(ax2)
-        cax = divider.append_axes("right", size="5%", pad=0.5)
+        cax = divider.append_axes("right", size="5%", pad=0.15)
         cbar = plt.colorbar(h2, cax=cax)
         cbar.ax.set_ylabel('Counts')
+        fig.subplots_adjust(right=0.9)
 
         if save:
             fig.savefig(save)
         plt.show()
     def __init__(self, directories):
         self.dirs = [directories] if type(directories) is str else directories
-
