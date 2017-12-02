@@ -44,6 +44,8 @@ def plot_dist():
     cbar = plt.colorbar(cax=cax)
     cbar.ax.set_ylabel(cbar_label)
     cbar.set_ticks([1,2,3,4,5])
+    
+    g.savefig('../figures/real_world_dist.png')
     plt.show()
 
 
