@@ -295,7 +295,8 @@ class Distribution:
                     for i in range(len(sys.info))])[0]
                     for date in sys.lightcurve.JD ]
                 sys.lightcurve[planet] = model_RVs
-            except (IOError, IndexError):
+            #except (IOError, IndexError, UnicodeDecodeError):
+            except:
                 sys.analyzer = None
                 warnings.warn('{}ps{}_.txt does not exist'.format(path, i+1), UserWarning)
 
@@ -388,7 +389,7 @@ class Distribution:
             color = 'red', axlabel=r'log $a$ (au)')
         fig.legend()
 
-            
+
         # add common ylabel
         fig.add_subplot(111, frameon=False)
         plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
