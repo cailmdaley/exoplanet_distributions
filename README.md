@@ -1,5 +1,5 @@
 # exoplanet_distributions
-Fitting the synthetic radial velocity curves of a distribution planets; please see the [paper](misc/exo_project_paper.pdf) for an in-depth explanation. Some choice figures are displayed below.
+Fitting the synthetic radial velocity curves of a distribution planets; please see the [paper](misc/exo_project_paper.pdf) for an in-depth explanation. Some choice figures are displayed below, and almost all of the interesting code is in [`classes.py`](classes.py)
 
 
 ![alt text](figures/fit_SNR=1.png)  
